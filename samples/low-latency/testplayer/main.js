@@ -1,4 +1,5 @@
-var METRIC_INTERVAL = 300;
+var METRIC_INTERVAL = 1000;
+var DATA_DOWNLOAD_TIME = 60;
 
 var App = function () {
     this.player = null;
@@ -11,7 +12,7 @@ var App = function () {
         chart: {}
     }
     this.chartTimeout = null;
-    this.chartReportingInterval = 300;
+    this.chartReportingInterval = 1000;
     this.chartNumberOfEntries = 30;
     this.chartData = {
         playbackTime: 0,
@@ -58,6 +59,9 @@ App.prototype._setDomElements = function () {
     this.domElements.metrics.videoMaxIndex = document.getElementById('video-max-index');
     this.domElements.metrics.videoIndex = document.getElementById('video-index');
     this.domElements.metrics.videoBitrate = document.getElementById('video-bitrate');
+    this.domElements.metrics.droppedFrames = document.getElementById('dropped-frames-tag');
+    this.domElements.metrics.stallEvents = document.getElementById('stall-events-tag');
+    this.domElements.metrics.stallDuration = document.getElementById('stall-duration-tag');
 }
 
 App.prototype._load = function () {
@@ -409,8 +413,23 @@ App.prototype._adjustChartSettings = function () {
 }
 
 
+function downloadLatencyData(data) {
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(data));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute('href', dataStr);
+    downloadAnchorNode.setAttribute('download', 'dashLatencyOverTime.json');
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+}
+
 App.prototype._startIntervalHandler = function () {
     var self = this;
+    var latencyOverTime = [];
+    var passedSeconds = 0;
+    var totalStallDuration = 0;
+    var stallStartTime = 0;
+    var bufferEvents = 0;
     setInterval(function () {
         if (self.player && self.player.isReady()) {
             var dashMetrics = self.player.getDashMetrics();
@@ -418,6 +437,41 @@ App.prototype._startIntervalHandler = function () {
 
             var currentLatency = parseFloat(self.player.getCurrentLiveLatency(), 10);
             self.domElements.metrics.latencyTag.innerHTML = currentLatency + ' secs';
+            if (passedSeconds === 0) {
+                setTimeout(() => {
+                    downloadLatencyData(latencyOverTime)
+                }, DATA_DOWNLOAD_TIME * 1000);
+                var videoElement = self.video;
+                videoElement.addEventListener('waiting', function() {
+                    stallStartTime = Date.now();
+                    bufferEvents++;
+                });
+
+                videoElement.addEventListener('playing', function() {
+                    if (stallStartTime !== 0) {
+                        var stallEndTime = Date.now();
+                        var stallDuration = (stallEndTime - stallStartTime) / 1000;
+
+                        totalStallDuration += stallDuration;
+
+                        stallStartTime = 0;
+                    }
+                });
+            }
+            if (passedSeconds <= DATA_DOWNLOAD_TIME) {
+                latencyOverTime.push({second: passedSeconds, latency: currentLatency})
+                passedSeconds++
+            }
+
+            var droppedFrames = dashMetrics.getCurrentDroppedFrames();
+            if (droppedFrames) {
+                var droppedFramesCount = droppedFrames.droppedFrames;
+            }
+            self.domElements.metrics.droppedFrames.innerHTML = droppedFramesCount;
+
+            self.domElements.metrics.stallEvents.innerHTML = bufferEvents;
+            self.domElements.metrics.stallDuration.innerHTML = totalStallDuration + ' secs';
+
 
             var currentPlaybackRate = self.player.getPlaybackRate();
             self.domElements.metrics.playbackrateTag.innerHTML = Math.round(currentPlaybackRate * 1000) / 1000;

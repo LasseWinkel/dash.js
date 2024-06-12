@@ -59,7 +59,7 @@
                             <h6>General</h6>
                             <div class="input-group input-group-sm mb-3">
                                 <span class="input-group-text">Target latency (sec)</span>
-                                <input type="number" id="target-latency" class="form-control" value="3"
+                                <input type="number" id="target-latency" class="form-control" value="0"
                                        step="0.5">
                             </div>
                             <div class="input-group input-group-sm mb-3">
@@ -347,6 +347,15 @@
                         <div><span class="metric-value"> Playback rate: </span><span
                             id="playbackrate-tag"></span>
                         </div>
+                        <div><span class="metric-value">Dropped Frames: </span><span
+                            id="dropped-frames-tag"></span>
+                        </div>
+                        <div><span class="metric-value">Number Of Stall Events: </span><span
+                            id="stall-events-tag"></span>
+                        </div>
+                        <div><span class="metric-value">Stall Duration: </span><span
+                            id="stall-duration-tag"></span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -368,7 +377,7 @@
                 </div>
                 <div class="input-group input-group-sm mb-3 mt-2">
                     <span class="input-group-text">Interval (ms)</span>
-                    <input type="number" id="chart-interval" class="form-control" value="300"
+                    <input type="number" id="chart-interval" class="form-control" value="1000"
                            step="50" min="200">
                 </div>
                 <div class="input-group input-group-sm mb-3 mt-2">
