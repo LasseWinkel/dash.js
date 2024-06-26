@@ -283,9 +283,10 @@
                 <div class="input-group mb-3">
                     <span class="input-group-text" id="basic-addon1">Manifest URL</span>
                     <input type="text" id="manifest" class="form-control" placeholder="MPD URL"
-                           value="http://14.0.0.1:8080/live/live.mpd"
-                           aria-label="Username"
-                           aria-describedby="basic-addon1">
+                            value="http://14.0.0.1:8080/live/live.mpd"
+                            aria-label="Username"
+                            aria-describedby="basic-addon1">
+                    <!-- https://cmafref.akamaized.net/cmaf/live-ull/2006350/akambr/out.mpd -->
                     <button type="button" id="load-button" class="btn btn-success">Load stream
                     </button>
                 </div>
@@ -347,6 +348,15 @@
                         <div><span class="metric-value"> Playback rate: </span><span
                             id="playbackrate-tag"></span>
                         </div>
+                        <div><span class="metric-value">Stream Time: </span><span
+                            id="stream-time-tag"></span>
+                        </div>
+                        <div><span class="metric-value">Total Frames: </span><span
+                            id="total-frames-tag"></span>
+                        </div>
+                        <div><span class="metric-value">Rendered Frames: </span><span
+                            id="rendered-frames-tag"></span>
+                        </div>
                         <div><span class="metric-value">Dropped Frames: </span><span
                             id="dropped-frames-tag"></span>
                         </div>
@@ -355,6 +365,15 @@
                         </div>
                         <div><span class="metric-value">Stall Duration: </span><span
                             id="stall-duration-tag"></span>
+                        </div>
+                        <div><span class="metric-value">Bitrate: </span><span
+                            id="bitrate-tag"></span>
+                        </div>
+                        <div><span class="metric-value">Frame Rate: </span><span
+                            id="frame-rate-tag"></span>
+                        </div>
+                        <div><span class="metric-value">Resolution: </span><span
+                            id="resolution-tag"></span>
                         </div>
                     </div>
                 </div>

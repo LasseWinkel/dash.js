@@ -1,5 +1,5 @@
 var METRIC_INTERVAL = 1000;
-var DATA_DOWNLOAD_TIME = 60;
+var DATA_DOWNLOAD_TIME = 80;
 
 var App = function () {
     this.player = null;
@@ -59,9 +59,15 @@ App.prototype._setDomElements = function () {
     this.domElements.metrics.videoMaxIndex = document.getElementById('video-max-index');
     this.domElements.metrics.videoIndex = document.getElementById('video-index');
     this.domElements.metrics.videoBitrate = document.getElementById('video-bitrate');
+    this.domElements.metrics.streamTime = document.getElementById('stream-time-tag');
+    this.domElements.metrics.totalFrames = document.getElementById('total-frames-tag');
+    this.domElements.metrics.renderedFrames = document.getElementById('rendered-frames-tag');
     this.domElements.metrics.droppedFrames = document.getElementById('dropped-frames-tag');
     this.domElements.metrics.stallEvents = document.getElementById('stall-events-tag');
     this.domElements.metrics.stallDuration = document.getElementById('stall-duration-tag');
+    this.domElements.metrics.bitrate = document.getElementById('bitrate-tag');
+    this.domElements.metrics.frameRate = document.getElementById('frame-rate-tag');
+    this.domElements.metrics.resolution = document.getElementById('resolution-tag');
 }
 
 App.prototype._load = function () {
@@ -413,7 +419,7 @@ App.prototype._adjustChartSettings = function () {
 }
 
 
-function downloadLatencyData(data) {
+function downloadCollectedDashMetrics(data) {
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(data));
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute('href', dataStr);
@@ -425,7 +431,7 @@ function downloadLatencyData(data) {
 
 App.prototype._startIntervalHandler = function () {
     var self = this;
-    var latencyOverTime = [];
+    var collectedDashMetrics = [];
     var passedSeconds = 0;
     var totalStallDuration = 0;
     var stallStartTime = 0;
@@ -433,13 +439,22 @@ App.prototype._startIntervalHandler = function () {
     setInterval(function () {
         if (self.player && self.player.isReady()) {
             var dashMetrics = self.player.getDashMetrics();
-            var settings = self.player.getSettings();
+            var streamInfo = self.player.getActiveStream().getStreamInfo();
+            var dashAdapter = self.player.getDashAdapter();
+
+            const periodIdx = streamInfo.index;
+            var repSwitch = dashMetrics.getCurrentRepresentationSwitch('video', true);
+            var bitrate = repSwitch ? Math.round(dashAdapter.getBandwidthForRepresentation(repSwitch.to, periodIdx) / 1000) : NaN;
+            var currentRep = self.player.getCurrentRepresentationForType('video');
+
+            var frameRate = currentRep.frameRate;
+            var resolution = currentRep.width + 'x' + currentRep.height;
 
             var currentLatency = parseFloat(self.player.getCurrentLiveLatency(), 10);
             self.domElements.metrics.latencyTag.innerHTML = currentLatency + ' secs';
             if (passedSeconds === 0) {
                 setTimeout(() => {
-                    downloadLatencyData(latencyOverTime)
+                    downloadCollectedDashMetrics(collectedDashMetrics)
                 }, DATA_DOWNLOAD_TIME * 1000);
                 var videoElement = self.video;
                 videoElement.addEventListener('waiting', function() {
@@ -458,19 +473,39 @@ App.prototype._startIntervalHandler = function () {
                     }
                 });
             }
+
+            var quality = self.video.getVideoPlaybackQuality();
+            var totalFrames = quality.totalVideoFrames;
+            var droppedFrames = quality.droppedVideoFrames;
+            var renderedFrames = totalFrames - droppedFrames;
+
             if (passedSeconds <= DATA_DOWNLOAD_TIME) {
-                latencyOverTime.push({second: passedSeconds, latency: currentLatency})
+                collectedDashMetrics.push({
+                    second: passedSeconds,
+                    latency: currentLatency,
+                    totalFrames,
+                    renderedFrames,
+                    droppedFrames,
+                    stallDuration: totalStallDuration,
+                    stallEvents: bufferEvents,
+                    bitrate,
+                    frameRate,
+                    resolution
+                })
                 passedSeconds++
             }
+            self.domElements.metrics.streamTime.innerHTML = passedSeconds + ' secs';
 
-            var droppedFrames = dashMetrics.getCurrentDroppedFrames();
-            if (droppedFrames) {
-                var droppedFramesCount = droppedFrames.droppedFrames;
-            }
-            self.domElements.metrics.droppedFrames.innerHTML = droppedFramesCount;
+            self.domElements.metrics.totalFrames.innerHTML = totalFrames;
+            self.domElements.metrics.renderedFrames.innerHTML = renderedFrames;
+            self.domElements.metrics.droppedFrames.innerHTML = droppedFrames;
 
             self.domElements.metrics.stallEvents.innerHTML = bufferEvents;
-            self.domElements.metrics.stallDuration.innerHTML = totalStallDuration + ' secs';
+            self.domElements.metrics.stallDuration.innerHTML = totalStallDuration.toFixed(3) + ' secs';
+
+            self.domElements.metrics.frameRate.innerHTML = frameRate + ' fps';
+            self.domElements.metrics.bitrate.innerHTML = bitrate + ' Kbps';
+            self.domElements.metrics.resolution.innerHTML = resolution;
 
 
             var currentPlaybackRate = self.player.getPlaybackRate();
