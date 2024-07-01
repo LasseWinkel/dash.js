@@ -435,7 +435,7 @@ App.prototype._startIntervalHandler = function () {
     var passedSeconds = 0;
     var totalStallDuration = 0;
     var stallStartTime = 0;
-    var bufferEvents = 0;
+    var stallEvents = 0;
     setInterval(function () {
         if (self.player && self.player.isReady()) {
             var dashMetrics = self.player.getDashMetrics();
@@ -459,7 +459,7 @@ App.prototype._startIntervalHandler = function () {
                 var videoElement = self.video;
                 videoElement.addEventListener('waiting', function() {
                     stallStartTime = Date.now();
-                    bufferEvents++;
+                    stallEvents++;
                 });
 
                 videoElement.addEventListener('playing', function() {
@@ -487,7 +487,7 @@ App.prototype._startIntervalHandler = function () {
                     renderedFrames,
                     droppedFrames,
                     stallDuration: totalStallDuration,
-                    stallEvents: bufferEvents,
+                    stallEvents: stallEvents,
                     bitrate,
                     frameRate,
                     resolution
@@ -500,7 +500,7 @@ App.prototype._startIntervalHandler = function () {
             self.domElements.metrics.renderedFrames.innerHTML = renderedFrames;
             self.domElements.metrics.droppedFrames.innerHTML = droppedFrames;
 
-            self.domElements.metrics.stallEvents.innerHTML = bufferEvents;
+            self.domElements.metrics.stallEvents.innerHTML = stallEvents;
             self.domElements.metrics.stallDuration.innerHTML = totalStallDuration.toFixed(3) + ' secs';
 
             self.domElements.metrics.frameRate.innerHTML = frameRate + ' fps';
