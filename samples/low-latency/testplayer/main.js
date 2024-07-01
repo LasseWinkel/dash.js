@@ -487,7 +487,7 @@ App.prototype._startIntervalHandler = function () {
                     renderedFrames,
                     droppedFrames,
                     stallDuration: totalStallDuration,
-                    stallEvents: stallEvents,
+                    stallEvents,
                     bitrate,
                     frameRate,
                     resolution
