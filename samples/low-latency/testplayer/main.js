@@ -1,4 +1,4 @@
-var METRIC_INTERVAL = 1000;
+var METRIC_INTERVAL = 1000 / 30;
 var DATA_DOWNLOAD_TIME = 80;
 
 var App = function () {
@@ -54,6 +54,10 @@ App.prototype._setDomElements = function () {
     this.domElements.metrics.latencyTag = document.getElementById('latency-tag');
     this.domElements.metrics.playbackrateTag = document.getElementById('playbackrate-tag');
     this.domElements.metrics.bufferTag = document.getElementById('buffer-tag');
+    this.domElements.metrics.totalLatencyTag = document.getElementById('total-latency-tag');
+    this.domElements.metrics.avgBehindLiveTag = document.getElementById('avg-behind-live-tag');
+    this.domElements.metrics.avgBufferTag = document.getElementById('avg-buffer-tag');
+    this.domElements.metrics.avgTotalLatencyTag = document.getElementById('avg-total-latency-tag');
     this.domElements.metrics.sec = document.getElementById('sec');
     this.domElements.metrics.min = document.getElementById('min');
     this.domElements.metrics.videoMaxIndex = document.getElementById('video-max-index');
@@ -102,7 +106,28 @@ App.prototype._applyParameters = function () {
     this.player.updateSettings({
         streaming: {
             delay: {
-                liveDelay: settings.targetLatency
+                liveDelay: 0
+            },
+            buffer: {
+                // enableSeekDecorrelationFix: false,
+                // fastSwitchEnabled: true,
+                // flushBufferAtTrackSwitch: false,
+                // reuseExistingSourceBuffers: true,
+                // bufferPruningInterval: 1,
+                // bufferToKeep: 1,
+                bufferTimeAtTopQuality: 0.001,
+                bufferTimeAtTopQualityLongForm: 0.001,
+                bufferTimeDefault: 0.001,
+                // initialBufferLevel: 0.1,
+                // stableBufferTime: 1,
+                longFormContentDurationThreshold: 600,
+                // stallThreshold: 0.3,
+                // useAppendWindow: true,
+                // setStallState: true,
+                // avoidCurrentTimeRangePruning: false,
+                // useChangeTypeForTrackSwitch: true,
+                // mediaSourceDurationInfinity: true,
+                // resetSourceBuffersForTrackSwitch: false
             },
             liveCatchup: {
                 enabled: settings.catchupEnabled,
@@ -418,12 +443,12 @@ App.prototype._adjustChartSettings = function () {
     this._enableChart(this.domElements.chart.enabled.checked);
 }
 
-
 function downloadCollectedDashMetrics(data) {
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(data));
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute('href', dataStr);
-    downloadAnchorNode.setAttribute('download', 'dashLatencyOverTime.json');
+    const downloadName = 'dash_frag100res1080fps30bit6gop2loss0delay0bw100.json';
+    downloadAnchorNode.setAttribute('download', downloadName);
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
@@ -436,10 +461,13 @@ App.prototype._startIntervalHandler = function () {
     var totalStallDuration = 0;
     var stallStartTime = 0;
     var stallEvents = 0;
+
     setInterval(function () {
         if (self.player && self.player.isReady()) {
             var dashMetrics = self.player.getDashMetrics();
-            var streamInfo = self.player.getActiveStream().getStreamInfo();
+            if (self.player.getActiveStream()) {
+                var streamInfo = self.player.getActiveStream().getStreamInfo();
+            }
             var dashAdapter = self.player.getDashAdapter();
 
             const periodIdx = streamInfo.index;
@@ -447,11 +475,18 @@ App.prototype._startIntervalHandler = function () {
             var bitrate = repSwitch ? Math.round(dashAdapter.getBandwidthForRepresentation(repSwitch.to, periodIdx) / 1000) : NaN;
             var currentRep = self.player.getCurrentRepresentationForType('video');
 
-            var frameRate = currentRep.frameRate;
+            var frameRate = parseInt(currentRep.frameRate.split('/')[0], 10);
             var resolution = currentRep.width + 'x' + currentRep.height;
 
             var currentLatency = parseFloat(self.player.getCurrentLiveLatency(), 10);
             self.domElements.metrics.latencyTag.innerHTML = currentLatency + ' secs';
+
+            var currentBuffer = dashMetrics.getCurrentBufferLevel('video');
+            self.domElements.metrics.bufferTag.innerHTML = currentBuffer + ' secs';
+
+            var totalLatency = parseFloat((currentLatency + currentBuffer).toFixed(3), 10);
+            self.domElements.metrics.totalLatencyTag.innerHTML = totalLatency + ' secs';
+
             if (passedSeconds === 0) {
                 setTimeout(() => {
                     downloadCollectedDashMetrics(collectedDashMetrics)
@@ -482,7 +517,9 @@ App.prototype._startIntervalHandler = function () {
             if (passedSeconds <= DATA_DOWNLOAD_TIME) {
                 collectedDashMetrics.push({
                     second: passedSeconds,
-                    latency: currentLatency,
+                    behindLive: currentLatency,
+                    buffer: currentBuffer,
+                    totalLatency,
                     totalFrames,
                     renderedFrames,
                     droppedFrames,
@@ -492,9 +529,9 @@ App.prototype._startIntervalHandler = function () {
                     frameRate,
                     resolution
                 })
-                passedSeconds++
+                passedSeconds += METRIC_INTERVAL / 1000
             }
-            self.domElements.metrics.streamTime.innerHTML = passedSeconds + ' secs';
+            self.domElements.metrics.streamTime.innerHTML = passedSeconds.toFixed(3) + ' secs';
 
             self.domElements.metrics.totalFrames.innerHTML = totalFrames;
             self.domElements.metrics.renderedFrames.innerHTML = renderedFrames;
@@ -507,12 +544,17 @@ App.prototype._startIntervalHandler = function () {
             self.domElements.metrics.bitrate.innerHTML = bitrate + ' Kbps';
             self.domElements.metrics.resolution.innerHTML = resolution;
 
+            const latestCollectedData = collectedDashMetrics.filter((aData) => passedSeconds - aData.second <= 5)
+            const averageBehindLive = latestCollectedData.reduce((accumulator, currentValue) => accumulator + currentValue.behindLive, 0) / latestCollectedData.length;
+            const averageBuffer = latestCollectedData.reduce((accumulator, currentValue) => accumulator + currentValue.buffer, 0) / latestCollectedData.length;
+            const averageTotalLatency = latestCollectedData.reduce((accumulator, currentValue) => accumulator + currentValue.totalLatency, 0) / latestCollectedData.length;
+
+            self.domElements.metrics.avgBehindLiveTag.innerHTML = averageBehindLive.toFixed(3) + ' secs';
+            self.domElements.metrics.avgBufferTag.innerHTML = averageBuffer.toFixed(3) + ' secs';
+            self.domElements.metrics.avgTotalLatencyTag.innerHTML = averageTotalLatency.toFixed(3) + ' secs';
 
             var currentPlaybackRate = self.player.getPlaybackRate();
             self.domElements.metrics.playbackrateTag.innerHTML = Math.round(currentPlaybackRate * 1000) / 1000;
-
-            var currentBuffer = dashMetrics.getCurrentBufferLevel('video');
-            self.domElements.metrics.bufferTag.innerHTML = currentBuffer + ' secs';
 
             var d = new Date();
             var seconds = d.getSeconds();
